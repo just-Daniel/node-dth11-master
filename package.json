@@ -1,0 +1,13 @@
+{
+  "name": "dht11-docker-simulator",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "express": "5.2.1",
+    "node-dht-sensor": "0.5.1",
+    "@influxdata/influxdb-client": "1.35.0"
+  }
+}
