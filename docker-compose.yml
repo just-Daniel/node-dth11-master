@@ -15,6 +15,8 @@ services:
     depends_on:
       - influxdb
     privileged: true
+    networks:
+      - sensor-network
 
   influxdb:
     image: influxdb:2.7
@@ -30,6 +32,13 @@ services:
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN}
     volumes:
       - influxdb-data:/var/lib/influxdb2
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sensor-network
 
   grafana:
     image: grafana/grafana:latest
@@ -43,7 +52,13 @@ services:
       - grafana-data:/var/lib/grafana
     depends_on:
       - influxdb
+    networks:
+      - sensor-network
 
 volumes:
   influxdb-data:
   grafana-data:
+
+networks:
+  sensor-network:
+    driver: bridge

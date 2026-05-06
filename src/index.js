@@ -36,8 +36,10 @@ async function collectData() {
   }
 }
 
-setInterval(collectData, 2000);
-collectData();
+setTimeout(() => {
+  collectData();
+  setInterval(collectData, 2000);
+}, 10000);
 
 app.get("/", (req, res) => {
   res.json({
