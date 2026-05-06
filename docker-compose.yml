@@ -1,7 +1,7 @@
 services:
   node-api:
     build: .
-    container_name: NODE_API
+    container_name: node-api
     ports:
       - "${NODE_API_PORT}:${NODE_INTERNAL_PORT}"
     environment:
@@ -14,10 +14,11 @@ services:
       INFLUX_BUCKET: ${INFLUXDB_BUCKET}
     depends_on:
       - influxdb
+    privileged: true
 
   influxdb:
     image: influxdb:2.7
-    container_name: INFLUXDB
+    container_name: influxdb
     ports:
       - "${INFLUXDB_PORT}:8086"
     environment:
@@ -32,7 +33,7 @@ services:
 
   grafana:
     image: grafana/grafana:latest
-    container_name: GRAFANA
+    container_name: grafana
     ports:
       - "${GRAFANA_PORT}:3000"
     environment:
