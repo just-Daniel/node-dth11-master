@@ -21,8 +21,27 @@ Grafana Dashboard
 - Grafana
 - Raspberry Pi 3
 - DHT11 sensor
+- ngrok
+- Bash
+- Linux systemd
 
-## Sensor Modes
+---
+
+# GPIO
+
+GPIO = General Purpose Input Output
+
+GPIO pins on Raspberry Pi allow communication with external hardware devices such as sensors.
+
+In this project, the DHT11 sensor is connected to a Raspberry Pi GPIO pin:
+
+```env
+GPIO_PIN=4
+```
+
+---
+
+# Sensor Modes
 
 The project supports two sensor modes:
 
@@ -34,54 +53,65 @@ SENSOR_MODE=real
 - `simulator` — generates fake temperature and humidity data.
 - `real` — reads temperature and humidity from a DHT11 sensor connected to Raspberry Pi GPIO.
 
-## Docker Compose Files
+---
 
-This project uses different Docker Compose files for different environments.
+# Docker Compose Files
 
-### `docker-compose.yml`
+This project uses different Docker Compose configurations depending on the environment.
 
-Used for local development on macOS or a normal Docker environment.
+## `docker-compose.yml`
 
-It uses Docker bridge networking:
+Used for local development on macOS or standard Docker environments.
+
+Uses Docker bridge networking.
+
+### Communication
 
 ```text
 node-api → influxdb:8086
 grafana  → influxdb:8086
 ```
 
-In this mode Docker creates an internal network between containers.  
-Containers can communicate using service names, for example:
+Docker automatically creates:
+
+- internal bridge network
+- internal DNS
+- container IP addresses
+
+Containers communicate using Docker service names:
 
 ```env
 INFLUX_URL=http://influxdb:8086
 ```
 
-### `docker-compose.rpi.yml`
+---
 
-Used on Raspberry Pi.
+## `docker-compose.rpi.yml`
 
-It uses host networking:
+Used specifically for Raspberry Pi.
+
+Uses host networking:
 
 ```yaml
 network_mode: host
 ```
 
-This means containers do not use Docker's internal bridge network.  
-Instead, they use the Raspberry Pi network directly.
+### Communication
 
-On Raspberry Pi, services communicate through localhost:
-
-```env
-INFLUX_URL=http://127.0.0.1:8087
+```text
+node-api → 127.0.0.1:8087
+grafana  → 127.0.0.1:8087
 ```
 
-This was needed because Docker bridge networking on Raspberry Pi did not correctly assign an IP address to the `node-api` container.
+Containers use Raspberry Pi networking directly.
 
-## Docker Networking Difference
+This configuration was required because Docker bridge networking on Raspberry Pi 3 did not correctly assign IP addresses to containers.
 
-### Bridge Network
+---
 
-Used on macOS:
+# Docker Networking Difference
+
+## Bridge Network (macOS)
 
 ```text
 Docker internal network
@@ -90,12 +120,12 @@ Docker internal network
 └── grafana
 ```
 
-Each container gets its own internal IP address.  
-Docker also provides internal DNS, so containers can reach each other by service name:
+### Characteristics
 
-```text
-influxdb
-```
+- each container has its own IP address
+- Docker provides internal DNS
+- containers communicate using service names
+- ports are isolated per container
 
 Example:
 
@@ -103,9 +133,9 @@ Example:
 INFLUX_URL=http://influxdb:8086
 ```
 
-### Host Network
+---
 
-Used on Raspberry Pi:
+## Host Network (Raspberry Pi)
 
 ```text
 Raspberry Pi host network
@@ -114,8 +144,12 @@ Raspberry Pi host network
 └── grafana
 ```
 
-Containers use the Raspberry Pi network directly.  
-There is no Docker internal DNS between containers.
+### Characteristics
+
+- containers share Raspberry Pi network
+- no Docker internal DNS
+- localhost refers to Raspberry Pi itself
+- ports must be unique
 
 Example:
 
@@ -123,27 +157,179 @@ Example:
 INFLUX_URL=http://127.0.0.1:8087
 ```
 
-## Ports
+---
 
-| Service     |                  macOS / Local |              Raspberry Pi |
-| ----------- | -----------------------------: | ------------------------: |
-| Node.js API |                           3001 | 3000 or configured `PORT` |
-| Grafana     |                           3000 |                      3000 |
-| InfluxDB    | 8087 external → 8086 container |                      8087 |
+# Ports
 
-## Run Locally on macOS
+| Service     | macOS / Local                  | Raspberry Pi |
+| ----------- | ------------------------------ | ------------ |
+| Node.js API | 3001                           | 3001         |
+| Grafana     | 3000                           | 3000         |
+| InfluxDB    | 8087 external → 8086 container | 8087         |
+
+---
+
+# Bash Scripts
+
+The project includes helper Bash scripts for starting services.
+
+## `start-mac.sh`
+
+Used on macOS.
+
+### Features
+
+- stops previous containers
+- rebuilds Docker images
+- starts services in background
+- prints local URLs
+
+### Run
+
+```bash
+./start-mac.sh
+```
+
+---
+
+## `start-rpi.sh`
+
+Used on Raspberry Pi.
+
+### Features
+
+- starts Docker stack
+- starts ngrok tunnel
+- saves ngrok logs
+- prints Raspberry Pi IP addresses
+
+### Run
+
+```bash
+./start-rpi.sh
+```
+
+---
+
+# Bash Basics
+
+## Shebang
+
+```bash
+#!/bin/bash
+```
+
+This line tells Linux to execute the script using Bash shell.
+
+---
+
+## Background Process
+
+```bash
+&
+```
+
+Runs a process in background.
+
+Example:
+
+```bash
+ngrok http 3000 &
+```
+
+---
+
+## Redirect Output
+
+```bash
+> file.log
+```
+
+Redirects terminal output into a file.
+
+Example:
+
+```bash
+ngrok http 3000 --log=stdout > ngrok.log &
+```
+
+This:
+
+- starts ngrok
+- saves logs into `ngrok.log`
+- runs ngrok in background
+
+---
+
+# systemd Service
+
+`systemd` is the Linux service manager.
+
+It:
+
+- starts services automatically
+- restarts crashed services
+- launches services after reboot
+
+Example:
+
+```ini
+[Service]
+ExecStart=/usr/bin/ngrok http 3000
+Restart=always
+```
+
+This automatically starts ngrok on Raspberry Pi boot.
+
+---
+
+# ngrok Remote Access
+
+ngrok creates a secure public tunnel to Grafana.
+
+Example:
+
+```text
+Internet
+    ↓
+https://xxxxx.ngrok-free.app
+    ↓
+Grafana on Raspberry Pi
+```
+
+This allows remote monitoring outside the local Wi-Fi network.
+
+---
+
+# Run Locally on macOS
 
 ```bash
 docker compose up --build
 ```
 
-## Run on Raspberry Pi
+or:
+
+```bash
+./start-mac.sh
+```
+
+---
+
+# Run on Raspberry Pi
 
 ```bash
 sudo docker compose -f docker-compose.rpi.yml up --build
 ```
 
-## Grafana
+or:
+
+```bash
+./start-rpi.sh
+```
+
+---
+
+# Grafana
 
 Grafana reads sensor data from InfluxDB and visualizes:
 
@@ -152,14 +338,46 @@ Grafana reads sensor data from InfluxDB and visualizes:
 - historical metrics
 - real-time charts
 
-For Raspberry Pi, use this InfluxDB URL in Grafana datasource settings:
+---
+
+# Grafana URLs
+
+## macOS
 
 ```text
-http://127.0.0.1:8087
+http://localhost:3000
 ```
 
-For macOS/local Docker bridge mode, use:
+## Raspberry Pi local network
+
+```text
+http://RPI_IP:3000
+```
+
+Example:
+
+```text
+http://10.0.0.47:3000
+```
+
+## Remote access using ngrok
+
+```text
+https://xxxxx.ngrok-free.app
+```
+
+---
+
+# InfluxDB Datasource URLs
+
+## macOS
 
 ```text
 http://influxdb:8086
+```
+
+## Raspberry Pi
+
+```text
+http://127.0.0.1:8087
 ```
